@@ -10,20 +10,31 @@ namespace CopyAzureKeyVault
 {
     public class KeyVaultCopier
     {
-        public async Task Copy(Config config)
+        private readonly Config config;
+
+        public KeyVaultCopier(Config config)
         {
-            var sourceKeyVaultUri = $"https://{config.SourceKeyVaultConfig.Name}.vault.azure.net";
-            var sourceKeyVaultClient = new SecretClient(new Uri(sourceKeyVaultUri), new ClientSecretCredential(config.SourceKeyVaultConfig.AzureTenantId, config.SourceKeyVaultConfig.ClientId, config.SourceKeyVaultConfig.ClientSecret));
+            this.config = config;
+        }
 
-            var items = sourceKeyVaultClient.GetPropertiesOfSecretsAsync().ConfigureAwait(false);
+        public async Task Copy()
+        {
+            // Build KeyVault Client for source 
+            var sourceKeyVaultClient = this.config.SourceKeyVaultConfig.BuildKeyVaultClient();
 
-            var targetKeyVaultUri = $"https://{config.TargetKeyVaultConfig.Name}.vault.azure.net";
-            var targetKeyVaultClient = new SecretClient(new Uri(targetKeyVaultUri), new ClientSecretCredential(config.TargetKeyVaultConfig.AzureTenantId, config.TargetKeyVaultConfig.ClientId, config.TargetKeyVaultConfig.ClientSecret));
+            // Get properties of all Secrets
+            var secretProperties = sourceKeyVaultClient.GetPropertiesOfSecretsAsync().ConfigureAwait(false);
 
-            await foreach (var item in items)
+            // Build KeyVault Client for Target
+            var targetKeyVaultClient = this.config.TargetKeyVaultConfig.BuildKeyVaultClient();
+
+            await foreach (var secretProperty in secretProperties)
             {
-                var secret = await sourceKeyVaultClient.GetSecretAsync(item.Name);
-                await targetKeyVaultClient.SetSecretAsync(new KeyVaultSecret(item.Name, secret.Value.Value));
+                // Get Source Secret value
+                var secret = await sourceKeyVaultClient.GetSecretAsync(secretProperty.Name);
+
+                // Insert into Target KeyVault
+                await targetKeyVaultClient.SetSecretAsync(new KeyVaultSecret(secretProperty.Name, secret.Value.Value));
             }
         }
     }

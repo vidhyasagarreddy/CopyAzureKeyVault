@@ -25,7 +25,7 @@ namespace CopyAzureKeyVault
                 }
             };
 
-            await (new KeyVaultCopier()).Copy(config);
+            await (new KeyVaultCopier(config)).Copy();
         }
     }
 }
